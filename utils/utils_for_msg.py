@@ -1,4 +1,6 @@
 from urllib.parse import urlparse
+import ffmpeg
+
 
 def is_valid_url(url: str) -> bool:
     """
@@ -9,3 +11,9 @@ def is_valid_url(url: str) -> bool:
         return all([result.scheme, result.netloc])  # Проверяем наличие схемы и домена
     except ValueError:
         return False
+
+
+
+
+
+

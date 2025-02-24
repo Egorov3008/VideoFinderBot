@@ -3,11 +3,6 @@ from aiogram.exceptions import TelegramNetworkError
 
 from handlers import start
 from bot import bot, dp
-# from handlers.notifications import notify_expiring_keys
-# from middlewares.registration_users import RegistrationMiddleware
-# from middlewares.database import DatabaseMiddleware
-# from middlewares.delete import DeleteMessageMiddleware
-# from middlewares.logging import LoggingMiddleware
 from logger import logger
 
 

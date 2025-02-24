@@ -39,11 +39,12 @@ async def handle_message(message: Message):
     text = message.text
     if is_valid_url(text):
         try:
+            await message.answer("Скачиваю видео...")
             path_vidio = await get_videos(text)  # Скачиваем видео
-            if os.path.exists(path_vidio):  # Проверяем, существует ли файл
-                video_file = FSInputFile(path_vidio)  # Используем FSInputFile
+            if os.path.exists(path_vidio):
+                video_file = FSInputFile(path_vidio)
                 await message.answer_video(video=video_file, caption="Ваше видео 🤗")
-                os.remove(path_vidio)  # Удаляем файл после отправки
+                os.remove(path_vidio)
             else:
                 await message.answer("Не удалось скачать видео. Попробуйте ещё раз.")
         except Exception as e:
