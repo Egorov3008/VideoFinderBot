@@ -1,5 +1,5 @@
 import asyncio
-import time
+import os
 
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -8,17 +8,7 @@ from logger import logger
 
 
 # Настройки прокси (если нужен)
-async def get_params_for_ssesion():
-    """
-    Получает параметры для сессии, включая User-Agent и куки.
-
-    Возвращает:
-    ----------
-    dict
-        Словарь с ключами:
-        - 'cookies_file': путь к файлу с куками.
-        - 'user_agent': User-Agent браузера.
-    """
+async def get_params_for_ssesion(url: str):
     try:
         # Настройки прокси (если нужен)
         proxy = "http://127.0.0.1:12334"  # Замените на ваш прокси
@@ -35,7 +25,7 @@ async def get_params_for_ssesion():
         driver = webdriver.Chrome(service=service, options=options)
 
         # Открываем YouTube
-        driver.get('https://www.youtube.com')
+        driver.get(url)
 
         # Ждём, пока страница загрузится
         await asyncio.sleep(5)
@@ -46,6 +36,9 @@ async def get_params_for_ssesion():
 
         # Получаем куки
         cookies = driver.get_cookies()
+
+        # Создаем папку cookies, если её нет
+        os.makedirs('cookies', exist_ok=True)
 
         # Сохраняем куки в файл
         cookies_file = 'cookies/cookies.txt'

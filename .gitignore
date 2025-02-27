@@ -7,7 +7,6 @@ videos/
 cookies/
 # Игнорировать файлы с чувствительными данными
 .env
-config.py
 secrets.py
 *.key
 *.pem

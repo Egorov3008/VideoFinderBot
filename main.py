@@ -1,7 +1,8 @@
 import asyncio
 from aiogram.exceptions import TelegramNetworkError
 
-from handlers import start
+from db import initialize_database
+from handlers import start, admin_panel
 from bot import bot, dp
 from logger import logger
 
@@ -13,8 +14,9 @@ async def main():
     Настраивает маршрутизатор, запускает бота в режиме поллинга или вебхука
     в зависимости от конфигурации.
     """
-
-    dp.include_router(start.router)  # Подключение маршрутизатора
+    await initialize_database()
+    dp.include_router(start.router)
+    dp.include_router(admin_panel.router)# Подключение маршрутизатора
 
     try:
         logger.info("Бот запущен")
