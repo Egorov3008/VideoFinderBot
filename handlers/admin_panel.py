@@ -15,7 +15,7 @@ class Form(StatesGroup):
     start_broadcast = State()
 
 
-@router.message((F.from_user.id in ADMIN_ID) & (F.text == '⚙️ АДМИНКА'))
+@router.message((F.from_user.id in ADMIN_ID) & (F.text == '/admin'))
 async def admin_handler(message: Message):
     await message.answer('Вам открыт доступ в админку! Выберите действие👇', reply_markup=admin_kb())
 

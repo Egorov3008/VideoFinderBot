@@ -20,7 +20,7 @@ async def is_user_subscribed(channel_url: str, telegram_id: int) -> bool:
             return False
     except Exception as e:
         # Если возникла ошибка (например, пользователь не найден или бот не имеет доступа к каналу)
-        print(f"Ошибка при проверке подписки: {e}")
+        logger.error(f"Ошибка при проверке подписки: {e}")
         return False
 
 
@@ -52,3 +52,6 @@ async def broadcast_message(users_data: list, text: str = None, photo_id: int = 
         finally:
             await asyncio.sleep(1)
     return good_send, bad_send
+
+
+

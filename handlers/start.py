@@ -6,13 +6,12 @@ from aiogram.filters import CommandStart
 from aiogram.types import (
     Message, FSInputFile, CallbackQuery, )
 
-from bot import bot
 from config import kb_list
 from db import get_user_by_id, add_user, update_bot_open_status
 from kb import main_contact_kb, channels_kb
 from logger import logger
 from utils_bot.utils import is_user_subscribed
-from utils_bot.utils_for_msg import is_valid_url, compress_video, split_video
+from utils_bot.utils_for_msg import split_video
 from utils_bot.youtube import get_videos
 
 router = Router()
@@ -45,48 +44,53 @@ async def start(message: Message):
         await start_msg(message)
 
 
-
 URL_REGEX = r'^(https?://[^\s]+)$'
+
+
+# @router.message(F.text)
+# async def msg_donknow(message: Message):
+#     await message.answer("Это не ссылка!\n"
+#                          "Я не понимаю о чем Вы 🤷\n"
+#                          "Пришлите ссылку на видео 📹")
+
 
 @router.message(lambda message: re.match(URL_REGEX, message.text))
 async def handle_message(message: Message):
     text = message.text
     path_vidio = None
-    if is_valid_url(text):
-        try:
-            await message.answer("Скачиваю видео...")
-            path_vidio = await get_videos(text)
-            # Скачиваем видео
-            if os.path.exists(path_vidio):
-                file_size = os.path.getsize(path_vidio)
-                logger.info(f"Размер файла {file_size}")
-                if file_size >= 50 * 1024 * 1024:
-                    logger.info("Файл больше 50 мб")
-                    await message.answer("Ваше видео слишком большое, я разделил его на несколько частей 🙌")
-                    # output_path = path_vidio[:-2] + '_output_path.mp4'
-                    # if compress_video(path_vidio, output_path):
-                    list_video: list[str] = split_video(path_vidio, 50)
-                    # os.remove(output_path)
-                    for index in range(len(list_video)):
-                            video_file = FSInputFile(list_video[index])
-                            await message.answer_video(video=video_file, caption=f"часть {index + 1} 🤗")
-                            os.remove(list_video[index])
+    try:
+        await message.answer("Скачиваю видео...")
+        path_vidio = await get_videos(text)
+        # Скачиваем видео
+        # if os.path.exists(path_vidio):
+        #     file_size = os.path.getsize(path_vidio)
+        #     logger.info(f"Размер файла {file_size}")
+        #     if file_size >= 50 * 1024 * 1024:
+        #         logger.info("Файл больше 50 мб")
+        # await message.answer("Ваше видео слишком большое, я разделил его на несколько частей 🙌")
+                # output_path = path_vidio[:-2] + '_output_path.mp4'
+                # if compress_video(path_vidio, output_path):
+                # list_video: list[str] = split_video(path_vidio, 50)
+                # os.remove(output_path)
+                # for index in range(len(list_video)):
+                #     video_file = FSInputFile(list_video[index])
+                #     await message.answer_video(video=video_file, caption=f"часть {index + 1} 🤗")
+                #     os.remove(list_video[index])
 
-                else:
-                    logger.info("Файл меньше либо равен 50 мб")
-                    video_file = FSInputFile(path_vidio)
-                    await message.answer_video(video=video_file, caption=f"Ваше видео 🤗")
-            else:
-                await message.answer("Не удалось скачать видео. Попробуйте ещё раз.")
-        except Exception as e:
-            await message.answer("Не удалось скачать видео. Попробуйте ещё раз.")
-            logger.error(f"Произошла ошибка: {e}")
-        finally:
-            if os.path.exists(path_vidio):
-                os.remove(path_vidio)
+            # else:
+            #     logger.info("Файл меньше либо равен 50 мб")
+        video_file = FSInputFile(path_vidio)
+        await message.answer_video(video=video_file, caption=f"Ваше видео 🤗")
+        os.remove(path_vidio)
+        # else:
+        #     await message.answer("Не удалось скачать видео. Попробуйте ещё раз.")
+    except Exception as e:
+        await message.answer("Не удалось скачать видео. Попробуйте ещё раз.")
+        logger.error(f"Произошла ошибка: {e}")
+    finally:
+        if os.path.exists(path_vidio):
+            os.remove(path_vidio)
 
-    else:
-        await message.answer("Это не валидный URL. Пожалуйста, отправьте корректный URL.")
 
 @router.callback_query(F.data == 'check_subscription')
 async def check_subs_func(call: CallbackQuery):
@@ -122,4 +126,3 @@ async def start_msg(message: Message):
                          "Давайте начнём! Отправьте мне ссылку, и я сделаю всё остальное. 😊")
     logger.info(f"Определяю права пользования пользователя: {message.from_user.id}")
     await main_contact_kb(message.from_user.id)
-

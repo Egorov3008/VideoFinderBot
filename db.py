@@ -7,10 +7,11 @@ async def initialize_database():
         # Создаем таблицу users, если она не существует
         await db.execute("""
             CREATE TABLE IF NOT EXISTS users (
-                telegram_id INTEGER PRIMARY KEY,
-                username TEXT,
-                first_name TEXT,
-                bot_open BOOLEAN DEFAULT FALSE
+            telegram_id INTEGER PRIMARY KEY,
+            username TEXT,
+            first_name TEXT,
+            bot_open BOOLEAN DEFAULT FALSE,
+            subscription_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
         # Сохраняем изменения
@@ -39,7 +40,7 @@ async def get_all_users():
                 "telegram_id": row[0],
                 "username": row[1],
                 "first_name": row[2],
-                "bot_open": bool(row[3])
+                "bot_open": bool(row[3]),
             }
             for row in rows
         ]

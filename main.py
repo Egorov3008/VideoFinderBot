@@ -1,6 +1,7 @@
 import asyncio
 from aiogram.exceptions import TelegramNetworkError
 
+from bot import set_commands
 from db import initialize_database
 from handlers import start, admin_panel
 from bot import bot, dp
@@ -15,6 +16,7 @@ async def main():
     в зависимости от конфигурации.
     """
     await initialize_database()
+    await set_commands()
     dp.include_router(start.router)
     dp.include_router(admin_panel.router)# Подключение маршрутизатора
 
