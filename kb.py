@@ -1,5 +1,6 @@
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButtonRequestUser, KeyboardButton, KeyboardButtonRequestChat, \
     InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from config import ADMIN_ID
 
@@ -36,7 +37,8 @@ def admin_kb():
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="👥 Пользователи", callback_data="admin_users")],
-            [InlineKeyboardButton(text="📧 Рассылка", callback_data="admin_broadcast")]
+            [InlineKeyboardButton(text="📧 Рассылка", callback_data="admin_broadcast")],
+            [InlineKeyboardButton(text="🔗 Подписка", callback_data="subscription")]
         ]
     )
     return keyboard
@@ -71,3 +73,9 @@ def channels_kb(kb_list: list):
     inline_keyboard.append([InlineKeyboardButton(text="Проверить подписку", callback_data="check_subscription")])
 
     return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
+
+def sub_kb(data: dict):
+    builder = InlineKeyboardBuilder()
+    for k, v in data.items():
+        builder.row(InlineKeyboardButton(text=f"{k}", callback_data=f"view_{v}"))
+    return builder
