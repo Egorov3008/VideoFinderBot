@@ -1,77 +1,109 @@
 import asyncio
 import os
+import re
 
-from yt_dlp import YoutubeDL
-
+from config import PROXY
 from logger import logger
 
 
-# Настройка логгера
+async def fetch_formats(url, proxy):
+    # Получаем список форматов
+    process = await asyncio.create_subprocess_exec(
+        'yt-dlp',
+        '--proxy', proxy,
+        '--list-formats',
+        url,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE
+    )
 
+    # Читаем вывод
+    stdout, stderr = await process.communicate()
 
-async def get_videos(video_url: str, retry: bool = True):
-    """
-    Загружает видео с указанного URL.
-
-    Параметры:
-    ----------
-    video_url : str
-        URL видео, которое необходимо загрузить.
-    retry : bool
-        Флаг для повторной попытки загрузки после обновления кук и User-Agent.
-
-    Возвращает:
-    ----------
-    str
-        Путь к загруженному видеофайлу.
-    """
-    logger.info("Старт программы")
-
-    # Создаем папку для видео, если её нет
-    os.makedirs('videos', exist_ok=True)
-
-    proxy = 'http://127.0.0.1:12334'  # Убедитесь, что прокси работает
-    #
-    # coockie: dict = await get_params_for_ssesion(video_url)
-    #
-    # if not coockie.get("cookies_file") or not coockie.get("user_agent"):
-    #     logger.error("Не удалось получить куки или User-Agent")
-    #     return None
-
-    # logger.debug(f"Передавемые значения в запрос:\n"
-    #              f"coockies : {coockie.get('cookies_file')}\n"
-    #              f"User-Agent: {coockie.get('user_agent')}")
-
-    format = 'bv*[ext=mp4][height<=720][height>=420]+bestaudio[ext=m4a]/best[ext=mp4][height<=720][height>=420]/best'
-    logger.info("Приступаю к скачиванию видео")
-    if any(name in video_url for name in ('insta', 'pin.it')):
-        logger.debug("Не youtube")
-        format = None
-
-    ydl_opts = {
-        'format': format,
-        'outtmpl': 'videos/%(title)s.%(ext)s',
-        'cookiefile': 'cookies.txt',
-        # 'cookiesfrombrowser': ('chrome',),
-        'proxy': proxy,
-        'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Linux; Android 14; moto g 5G - 2024 Build/U1UFNS34.41-98-3-13; ) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36 EdgA/124.0.2478.64'
-        }
-    }
-
-    try:
-        with YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(video_url, download=True)
-            file_path = ydl.prepare_filename(info)
-
-            return file_path
-
-    except Exception as e:
-        logger.error(f"Произошла ошибка: {e}")
+    if process.returncode != 0:
+        logger.error(f"Ошибка при выполнении команды: {stderr.decode().strip()}")
         return None
 
+    # Получаем вывод
+    output = stdout.decode()
 
-#
-# video = "https://youtu.be/wpfpey_0G5A?si=SNgc8nXrVOdec8VJ"
-# asyncio.run(get_videos(video))
-# # get_video_urls(video)
+    # Регулярное выражение для поиска форматов с ID, состоящими только из цифр
+    pattern = r'^\s*(\d+)\s+mp4\s+\d+x\d+\s+\|\s+.*\s+https\s+.*$'
+
+    # Находим все подходящие форматы
+    matches = re.findall(pattern, output, re.MULTILINE)
+    logger.info(f"Полученные форматы: {matches}")
+
+    return matches[0]
+
+
+async def video(url):
+    try:
+        proxy = PROXY
+        logger.info(f"Передаю прокси для скачивания: {proxy}")
+        output_template = os.path.expanduser('~/Videos/%(title)s.%(ext)s')
+        if not os.path.exists(output_template):
+            # Если папка не существует, создаем её
+            os.makedirs(output_template)
+
+        logger.info(f"Скачиваю видео {url}")
+
+        if any(name in url for name in ('https://youtu.be', 'youtu.be', 'https://www.youtube.com/', 'youtube')):
+            format = 'bestvideo[vcodec^=avc1][width<=720][height<=1280]+bestaudio/bestvideo[vcodec^=avc1][width<=1280][height<=720]+bestaudio'
+            command = [
+                'yt-dlp',
+                '--proxy', proxy,
+                '--cookies', 'cookies.txt',
+                '-o', output_template,
+                '-f', format,
+                '--merge-output-format', 'mp4',
+                '--print', 'after_move:filepath',
+                url
+            ]
+
+        elif any(name in url for name in ('instagram', 'https://www.instagram')):
+            format = await fetch_formats(url, proxy)
+
+            command = [
+                'yt-dlp',
+                '--proxy', proxy,
+                '--cookies', 'cookies.txt',
+                '-o', output_template,
+                '-f', format,
+                '--merge-output-format', 'mp4',
+                '--print', 'after_move:filepath',
+                url
+            ]
+        else:
+            command = [
+                'yt-dlp',
+                '--proxy', proxy,
+                '--cookies', 'cookies.txt',
+                '-o', output_template,
+                '--merge-output-format', 'mp4',
+                '--print', 'after_move:filepath',
+                url
+            ]
+
+        process = await asyncio.create_subprocess_exec(
+            *command,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+
+        stdout, stderr = await process.communicate()
+
+        if process.returncode != 0:
+            logger.error(f"Ошибка при скачивании видео: {stderr.decode()}")
+            return None
+
+        file_path = stdout.decode().strip()
+        if not file_path:
+            logger.error("Путь к файлу не был получен.")
+            return None
+
+        logger.info(f"Путь к файлу: {file_path}")
+        return file_path
+    except Exception as e:
+        logger.error(f"Произошла ошибка в функции video: {e}")
+        return None

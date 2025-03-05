@@ -1,19 +1,26 @@
-from urllib.parse import urlparse
-from logger import logger
-import subprocess
-import ffmpeg
 import os
+import subprocess
+import re
+import ffmpeg
+
+from logger import logger
 
 
-def is_valid_url(url: str) -> bool:
-    """
-    Проверяет, является ли строка валидным URL.
-    """
-    try:
-        result = urlparse(url)
-        return all([result.scheme, result.netloc])  # Проверяем наличие схемы и домена
-    except ValueError:
-        return False
+def is_valid_social_media_url(url: str) -> bool:
+    # Регулярные выражения для различных сервисов
+    patterns = {
+        'youtube': r'^(https?://)?(www\.)?(youtube\.com/watch\?v=|youtu\.be/)[\w-]{11}$',
+        'instagram': r'^(https?://)?(www\.)?instagram\.com/[\w.-]+/?$',
+        'vk': r'^(https?://)?(www\.)?vk\.com/[\w.-]+/?$',
+        'tiktok': r'^(https?://)?(www\.)?tiktok\.com/@[\w.-]+/?$',
+        'pinterest': r'^(https?://)?(www\.)?pinterest\.com/[\w.-]+/?$'
+    }
+
+    for service, pattern in patterns.items():
+        if re.match(pattern, url):
+            return True
+
+    return False
 
 
 def compress_video(input_path, output_path, crf=23):
@@ -42,12 +49,13 @@ def compress_video(input_path, output_path, crf=23):
         return None
 
 
-
 def split_video(file_path, max_size_mb):
     logger.info("Получаем информацию о видео")
     # Получаем информацию о видео
     list_video = []
-    result = subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', file_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    result = subprocess.run(
+        ['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1',
+         file_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     duration = float(result.stdout)
     logger.info("Рассчитываем количество частей")
     # Рассчитываем количество частей
@@ -60,6 +68,6 @@ def split_video(file_path, max_size_mb):
     for i in range(num_parts):
         start_time = i * part_duration
         output_file = f"{file_path}_part{i + 1}.mp4"
-        subprocess.run(['ffmpeg', '-i', file_path, '-ss', str(start_time), '-t', str(part_duration), '-c', 'copy', output_file])
+        subprocess.run(
+            ['ffmpeg', '-i', file_path, '-ss', str(start_time), '-t', str(part_duration), '-c', 'copy', output_file])
         list_video.append(output_file)
-

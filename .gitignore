@@ -21,7 +21,8 @@ __pycache__/
 .vscode/
 *.swp
 *.swo
-
+*.txt
+cookies.txt
 # Игнорировать логи
 logs/
 *.log

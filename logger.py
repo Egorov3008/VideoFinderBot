@@ -36,7 +36,7 @@ class InterceptHandler(logging.Handler):
             exception_traceback = ''.join(traceback.format_exception(*record.exc_info))
             message += f"\n<red>Exception:</red> {exception_traceback}"  # Добавляем текст исключения
 
-        logger_opt.log(level_mapping.get(record.levelno, "DEBUG"), message)
+        logger_opt.log(level_mapping.get(record.levelno, "INFO"), message)
 
 
 # Настройка базового логирования

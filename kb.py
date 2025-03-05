@@ -1,36 +1,5 @@
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButtonRequestUser, KeyboardButton, KeyboardButtonRequestChat, \
-    InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-
-from config import ADMIN_ID
-
-
-def cancel_btn():
-    return ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text="❌ Отмена")]],
-        resize_keyboard=True,
-        one_time_keyboard=False,
-        input_field_placeholder="Или нажмите на 'ОТМЕНА' для отмены"
-    )
-
-
-async def main_contact_kb(user_id: int):
-
-    buttons = []
-    if user_id in ADMIN_ID:
-        buttons =[[
-            KeyboardButton(
-                text="⚙️ АДМИНКА",
-            )
-        ]]
-
-    keyboard = ReplyKeyboardMarkup(
-        keyboard=buttons,
-        resize_keyboard=True,
-        one_time_keyboard=False
-    )
-
-    return keyboard
 
 
 def admin_kb():
@@ -74,8 +43,16 @@ def channels_kb(kb_list: list):
 
     return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
 
+
 def sub_kb(data: dict):
     builder = InlineKeyboardBuilder()
     for k, v in data.items():
         builder.row(InlineKeyboardButton(text=f"{k}", callback_data=f"view_{v}"))
+    builder.row(InlineKeyboardButton(text="Добавить подписку", callback_data="add_sub"))
+    return builder
+
+
+def edit_sub(url_sub):
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="Удалить канал", callback_data=f"delete_{url_sub}"))
     return builder

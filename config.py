@@ -11,4 +11,6 @@ else:
 API_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN = os.getenv("ADMIN_ID")
 ADMIN_ID = ast.literal_eval(ADMIN)
-kb_list = [{'label': 'Тестовый канал', 'url': 'https://t.me/test_grup_01111'}]
+
+PROXY = os.getenv("PROXY")
+SUPPORT_CHAT_URL = os.getenv("SUPPORT_CHAT_URL")
