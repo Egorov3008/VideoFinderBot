@@ -12,7 +12,7 @@ from db import get_subscription, get_all_users, add_user
 from logger import logger
 from text_msg import start_message
 from utils_bot.utils import is_user_subscribed
-from utils_bot.youtube import video
+from utils_bot.download import video
 
 router = Router()
 
@@ -22,7 +22,7 @@ async def start(message: Message):
     builder = InlineKeyboardBuilder()
     is_admin = message.from_user.id in ADMIN_ID
     users = await get_all_users()
-    if message.from_user.id in [user_id["telegram_id"] for user_id in users]:
+    if message.from_user.id not in [user_id["telegram_id"] for user_id in users]:
         await add_user(
             message.from_user.id,
             message.from_user.username,
@@ -73,8 +73,8 @@ async def handle_message(message: Message):
 async def check_subs_func(call: CallbackQuery):
     tg_id = call.from_user.id
     if await check_substraction(tg_id, call):
-        await call.answer('Спасибо за подписку 🙏\n'
-                          '📥 Отправь ссылку на видео из\n'
+        await call.message.answer('Спасибо за подписку 🙏\n'
+                          '📥 Теперь ты можешь отправь ссылку на видео из\n'
                           'Instagram, TikTok, YouTube, VK или Pinterest\n '
                           'И бот скачает видео без водяного знака.')
 
@@ -91,6 +91,36 @@ async def start_msg(message: Message, kb: InlineKeyboardBuilder):
 
 
 async def check_substraction(tg_id, message: Message | CallbackQuery):
+    """
+    Проверяет, подписан ли пользователь на необходимые каналы.
+
+    Параметры:
+    - tg_id (int): Идентификатор пользователя в Telegram.
+    - message (Message | CallbackQuery): Сообщение или обратный вызов, который инициировал проверку подписки.
+
+    Возвращает:
+    - bool: True, если пользователь подписан на все необходимые каналы или является администратором,
+            False, если пользователь не подписан на один или несколько каналов.
+
+    Логика работы:
+    1. Если пользователь является администратором (tg_id находится в ADMIN_ID), функция сразу возвращает True.
+    2. Логирует проверку подписки пользователя.
+    3. Получает список обязательных подписок с помощью функции get_subscription().
+    4. Если есть обязательные подписки:
+        - Проверяет, подписан ли пользователь на каждый из каналов.
+        - Если пользователь не подписан на один или несколько каналов:
+            - Формирует клавиатуру с кнопками для подписки на недостающие каналы.
+            - Отправляет сообщение пользователю с просьбой подписаться.
+            - Логирует информацию о том, что сообщение было отправлено.
+        - Если пользователь подписан на все каналы:
+            - Логирует информацию о том, что пользователь подписан на все каналы или является администратором.
+            - Возвращает True.
+    5. Если нет обязательных подписок, логирует это и возвращает True.
+    """
+
+    if tg_id in ADMIN_ID:
+        return True
+
     logger.debug(f"Проверяю подписку пользователя: {tg_id} на каналы")
     dict_sub = await get_subscription()
     logger.info(f"Получены подписки: {dict_sub}")
@@ -106,7 +136,6 @@ async def check_substraction(tg_id, message: Message | CallbackQuery):
             logger.warning(f"Пользователь {tg_id} не подписан на один или несколько каналов.")
             builder = InlineKeyboardBuilder()
             for channel, subscribed in dict_sub_users.items():
-
                 if not subscribed:
                     builder.row(InlineKeyboardButton(text=channel[0], url=channel[1]))
             builder.row(InlineKeyboardButton(text="Проверить подписку 📍", callback_data='check_subscription'))
@@ -120,7 +149,7 @@ async def check_substraction(tg_id, message: Message | CallbackQuery):
                                              reply_markup=builder.as_markup())
                 logger.info(f"Отправлено сообщение о подписке на канал пользователю {tg_id} через callback_query")
             return False
-        elif any(v for v in dict_sub_users.values() if v) or tg_id in ADMIN_ID:
+        elif any(v for v in dict_sub_users.values() if v):
             logger.info(f"Пользователь {tg_id} подписан на все каналы или является администратором.")
             return True
     else:

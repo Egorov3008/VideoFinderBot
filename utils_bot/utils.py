@@ -1,10 +1,10 @@
 import asyncio
 
 from aiogram.enums import ContentType, ChatMemberStatus
-from aiogram.types import InlineKeyboardButton
-from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from bot import bot
+from config import ADMIN_ID
+from db import get_users_sub, add_count_users_sub, check_user_set_active
 from logger import logger
 
 
@@ -21,9 +21,12 @@ async def check_bot_status(channel_username: str) -> bool | str:
             return True
         else:
             logger.info(f"Бот не является участником канала {channel_username}.")
+            await bot.send_message(chat_id=ADMIN_ID[0], text=f'Бот не является админом группы: {channel_username}')
             return False
     except Exception as e:
         logger.error(f"Ошибка при проверке статуса бота: {e}")
+        await bot.send_message(chat_id=ADMIN_ID[0],
+                               text=f'Не удалось определить статус бота в группе: {channel_username}')
         return False
 
 
@@ -33,18 +36,28 @@ async def is_user_subscribed(channel_url: str, telegram_id: int) -> bool:
     chech_bot = await check_bot_status(channel_username)
     if chech_bot:
         try:
+            list_users: list[int] = await get_users_sub(channel_url)
+            logger.debug(f"Cписок пользователей для {channel_url} : {list_users}")
+            is_sub_chekc = await check_user_set_active(user_active=len(list_users), url_subscription=channel_url)
 
-            logger.debug(f"Проверка подписки пользователя {telegram_id} на канал: {channel_username}")
+            if not is_sub_chekc:
 
-            # Получаем информацию о пользователе в канале
-            member = await bot.get_chat_member(chat_id=f"@{channel_username}", user_id=telegram_id)
-            logger.info(f"Статус подписки пользователя {telegram_id} для канала {channel_username}: {member.status}")
+                logger.debug(f"Проверка подписки пользователя {telegram_id} на канал: {channel_username}")
+                # Получаем информацию о пользователе в канале
+                member = await bot.get_chat_member(chat_id=f"@{channel_username}", user_id=telegram_id)
+                logger.info(
+                    f"Статус подписки пользователя {telegram_id} для канала {channel_username}: {member.status}")
 
-            # Проверяем статус пользователя
-            if member.status in [ChatMemberStatus.MEMBER, ChatMemberStatus.CREATOR, ChatMemberStatus.ADMINISTRATOR]:
-                return True
-            else:
-                return False
+                # Проверяем статус пользователя
+                if member.status in [ChatMemberStatus.MEMBER, ChatMemberStatus.CREATOR, ChatMemberStatus.ADMINISTRATOR]:
+
+                    if telegram_id not in list_users:
+                        await add_count_users_sub(channel_url, telegram_id)
+                    return True
+
+                else:
+                    return False
+            return True
         except Exception as e:
             # Если возникла ошибка (например, пользователь не найден или бот не имеет доступа к каналу)
             logger.error(

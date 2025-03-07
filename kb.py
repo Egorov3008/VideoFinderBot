@@ -55,4 +55,5 @@ def sub_kb(data: dict):
 def edit_sub(url_sub):
     builder = InlineKeyboardBuilder()
     builder.row(InlineKeyboardButton(text="Удалить канал", callback_data=f"delete_{url_sub}"))
+    builder.row(InlineKeyboardButton(text="Изменить", callback_data="edit"))
     return builder

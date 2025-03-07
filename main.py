@@ -6,6 +6,7 @@ from db import initialize_database
 from handlers import start, admin_panel
 from logger import logger
 from middlewares.delet_msg import DeleteMessageMiddleware
+from middlewares.subscribe_channel import SubscribeChannel
 
 
 # def run_flask():
@@ -21,7 +22,8 @@ async def main():
     await initialize_database()
     await set_commands()
 
-
+    # dp.message.middleware(SubscribeChannel())
+    # dp.callback_query.middleware(SubscribeChannel())
     dp.message.middleware(DeleteMessageMiddleware())
     dp.callback_query.middleware(DeleteMessageMiddleware())
     dp.include_router(admin_panel.router)
