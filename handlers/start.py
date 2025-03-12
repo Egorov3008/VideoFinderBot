@@ -142,8 +142,7 @@ async def check_substraction(tg_id, message: Message | CallbackQuery):
                     builder.row(InlineKeyboardButton(text=channel[0], url=channel[1]))
             builder.row(InlineKeyboardButton(text="Проверить подписку 📍", callback_data='check_subscription'))
             if isinstance(message, Message):
-                await message.answer(f"😊 Чтобы использовать бота, подпишитесь на каналы,\n перечисленные ниже"
-                                     f"и нажмите кнопку 'Проверить подписку 📍',\n как только вы подпишетесь.",
+                await message.answer(f"Чтобы получить доступ к функциям бота,\n<b>нужно подписаться на ресурсы:</b>",
                                      reply_markup=builder.as_markup())
                 logger.info(f"Отправлено сообщение о подписке на канал пользователю {tg_id}")
             if isinstance(message, CallbackQuery):
