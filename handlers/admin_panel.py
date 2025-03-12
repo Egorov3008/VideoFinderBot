@@ -80,13 +80,15 @@ async def admin_users_handler(call: CallbackQuery):
     csv_file.close()
     txt_file.close()
 
+
 @router.callback_query(F.data == 'admin_broadcast', IsAdminFilter())
 async def admin_broadcast_handler(call: CallbackQuery, state: FSMContext):
     await call.answer()
     builder = InlineKeyboardBuilder()
     builder.row(InlineKeyboardButton(text='Назад', callback_data='admin_panel'))
     await call.message.answer(
-        'Отправьте любое сообщение, а я его перехвачу и перешлю всем пользователям с базы данных'
+        'Отправьте любое сообщение, а я его перехвачу и перешлю всем пользователям с базы данных',
+        reply_markup=builder.as_markup()
     )
     await state.set_state(Form.start_broadcast)
 
@@ -154,9 +156,10 @@ async def handel_view_subscription(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data == "add_sub", IsAdminFilter())
 async def handle_add_sub(callback: CallbackQuery, state: FSMContext):
-    await callback.message.answer("<b>Пожалуйста, введите ссылку на канал и его название, разделив их символом '|'.</b>\n"
-                                  "Пример: 👇\n\nhttps://t.me/username|название канала|количество пользователей\n\n"
-                                  "Обратите внимание, что название канала должно быть коротким и легко воспринимаемым для вас.")
+    await callback.message.answer(
+        "<b>Пожалуйста, введите ссылку на канал и его название, разделив их символом '|'.</b>\n"
+        "Пример: 👇\n\nhttps://t.me/username|название канала|количество пользователей\n\n"
+        "Обратите внимание, что название канала должно быть коротким и легко воспринимаемым для вас.")
     await state.set_state(Form.sub_action)
 
 
@@ -183,6 +186,7 @@ async def handle_delete_sub(callback: CallbackQuery):
     buttons = InlineKeyboardBuilder()
     buttons.row(InlineKeyboardButton(text="Назад", callback_data="subscription"))
     await callback.message.answer("Подписка удалена", reply_markup=buttons.as_markup())
+
 
 @router.callback_query(F.data == "edit", IsAdminFilter())
 async def handle_edit_sub(callback: CallbackQuery, state: FSMContext):
