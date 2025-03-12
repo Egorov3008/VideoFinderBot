@@ -45,8 +45,9 @@ async def fetch_formats(url, proxy):
 async def video(url):
     try:
         cookies = os.path.join(BASE_DIR, 'cookies/cookies.txt')
-        proxy = PROXY
-        logger.info(f"Передаю прокси для скачивания: {proxy}")
+        logger.info(cookies)
+
+        # logger.info(f"Передаю прокси для скачивания: {proxy}")
         output_template = os.path.expanduser('~/Videos/%(title)s.%(ext)s')
         if not os.path.exists(output_template):
             # Если папка не существует, создаем её
@@ -56,7 +57,6 @@ async def video(url):
 
         command = [
             'yt-dlp',
-            '--proxy', proxy,
             '--cookies', cookies,
             '-o', output_template,
             '-f',

@@ -4,7 +4,7 @@ from typing import List, Dict, Optional, Any
 import aiosqlite
 
 logger = logging.getLogger('aiosqlite')
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 
 async def initialize_database():
