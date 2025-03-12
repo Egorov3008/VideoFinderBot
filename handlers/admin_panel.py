@@ -22,7 +22,8 @@ class Form(StatesGroup):
 
 
 @router.callback_query(F.data == 'admin_panel', IsAdminFilter())
-async def admin_handler(call: CallbackQuery):
+async def admin_handler(call: CallbackQuery, state: FSMContext):
+    await state.clear()
     kb = admin_kb()
     await call.message.answer('Выберите действие👇', reply_markup=kb)
 
@@ -73,7 +74,8 @@ async def admin_broadcast_handler(call: CallbackQuery, state: FSMContext):
 
 
 @router.callback_query(F.data == "subscription", IsAdminFilter())
-async def handle_subscription(callback: CallbackQuery):
+async def handle_subscription(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
     dict_subscription: dict = await get_subscription()
     builder = InlineKeyboardBuilder()
     text = ''
@@ -139,11 +141,15 @@ async def handle_add_sub(callback: CallbackQuery, state: FSMContext):
     await state.set_state(Form.sub_action)
 
 
-@router.message(F.text, Form.sub_action, IsAdminFilter())
+@router.message(F.text, Form.sub_action)
 async def handle_url_sub(message: Message, state: FSMContext):
-    sub_url = message.text.split("|")[0]
-    name_sub = message.text.split("|")[1]
-    users_set = message.text.split("|")[2]
+    list_msg = message.text.split("|")
+    if len(list_msg) != 3:
+        await message.answer("Вы ввели некорректные данные, попробуйте еще раз")
+        return
+    sub_url = list_msg[0]
+    name_sub = list_msg[1]
+    users_set = list_msg[2]
     await add_sub_url(name=name_sub, url_sub=sub_url, users_set=int(users_set))
     buttons = InlineKeyboardBuilder()
     buttons.row(InlineKeyboardButton(text="Назад", callback_data="subscription"))
