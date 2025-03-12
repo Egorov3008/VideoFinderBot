@@ -8,6 +8,8 @@ if not find_dotenv():
 else:
     load_dotenv()
 
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 API_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN = os.getenv("ADMIN_ID")
 ADMIN_ID = ast.literal_eval(ADMIN)

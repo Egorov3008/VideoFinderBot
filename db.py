@@ -4,7 +4,7 @@ from typing import List, Dict, Optional, Any
 import aiosqlite
 
 logger = logging.getLogger('aiosqlite')
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 
 async def initialize_database():
@@ -135,7 +135,7 @@ async def get_user_by_id(telegram_id: int) -> Optional[Dict]:
     return user
 
 
-async def get_subscription() -> Optional[Dict]:
+async def get_subscription() -> Optional[List[Dict]]:
     """
     Получает данные о подписке из таблицы subscription.
 
@@ -144,15 +144,14 @@ async def get_subscription() -> Optional[Dict]:
     logger.info("Получение данных о подписке...")
     async with aiosqlite.connect("bot.db") as db:
         cursor = await db.execute("SELECT * FROM subscription;")
-        row = await cursor.fetchone()
+        row = await cursor.fetchall()
 
         if row is None:
             logger.warning("Подписка не найдена.")
             return None
 
-        subscription = {
-            row[0]: row[1],
-        }
+        subscription = [{value[0]: value[1]} for value in row]
+        logger.debug(f'Обязательные подписки: {subscription}')
     logger.info("Данные о подписке получены.")
     return subscription
 
@@ -222,6 +221,7 @@ async def add_sub_url(name: str, url_sub: str, users_set: int):
         """, (name, url_sub, users_set))
         await db.commit()
     logger.info("Подписка добавлена или обновлена.")
+
 
 async def get_user_counts() -> Dict[str, int]:
     """

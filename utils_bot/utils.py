@@ -26,7 +26,8 @@ async def check_bot_status(channel_username: str) -> bool | str:
     except Exception as e:
         logger.error(f"Ошибка при проверке статуса бота: {e}")
         await bot.send_message(chat_id=ADMIN_ID[0],
-                               text=f'Не удалось определить статус бота в группе: {channel_username}')
+                               text=f'Не удалось определить статус бота в группе: \n'
+                                    f'<code>https://t.me/{channel_username}</code>')
         return False
 
 

@@ -1,5 +1,5 @@
 import os
-import re
+from typing import Optional, List, Dict
 
 import validators
 from aiogram import Router, F
@@ -40,6 +40,7 @@ async def start(message: Message, state: FSMContext):
 @router.message(lambda message: validators.url(message.text))
 async def handle_message(message: Message):
     tg_id = message.from_user.id
+    check_file_size = 200 * 1024 * 1024 if message.from_user.is_premium else 50 * 1024 * 1024
     if await check_substraction(tg_id, message):
         text = message.text
         await message.answer("Ищу и скачиваю видео... 🔍")
@@ -48,10 +49,10 @@ async def handle_message(message: Message):
         try:
             path_vidio = await video(text)
             # Проверяем, был ли установлен путь к видео
-            if path_vidio is not None and os.path.exists(path_vidio):
+            if path_vidio and os.path.exists(path_vidio):
                 file_size = os.path.getsize(path_vidio)
                 logger.info(f"Видео весит: {file_size}")
-                if file_size <= 50 * 1024 * 1024:
+                if file_size <= check_file_size:
                     # await bot.delete_messages(chat_id=msg_del.chat.id, message_ids=msg_del.message_id)
                     video_file = FSInputFile(path_vidio)
 
@@ -122,13 +123,14 @@ async def check_substraction(tg_id, message: Message | CallbackQuery):
         return True
 
     logger.debug(f"Проверяю подписку пользователя: {tg_id} на каналы")
-    dict_sub = await get_subscription()
-    logger.info(f"Получены подписки: {dict_sub}")
+    list_sub: Optional[List[Dict]] = await get_subscription()
+    logger.info(f"Получены подписки: {list_sub}")
 
-    if dict_sub:
+    if list_sub:
         dict_sub_users = {
-            (channel, url_sub): await is_user_subscribed(channel_url=url_sub, telegram_id=tg_id) for channel, url_sub
-            in dict_sub.items()
+            (channel, url_sub): await is_user_subscribed(channel_url=url_sub, telegram_id=tg_id)
+            for dict_sub in list_sub  # Перебираем каждый словарь в списке
+            for channel, url_sub in dict_sub.items()  # Перебираем пары channel: url_sub в каждом словаре
         }
         logger.debug(f"Статусы подписок пользователей: {dict_sub_users}")
 

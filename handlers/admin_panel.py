@@ -1,4 +1,5 @@
 from io import BytesIO
+from typing import Optional, List, Dict
 
 from aiogram import Router, F
 from aiogram.enums import ContentType
@@ -39,34 +40,51 @@ async def admin_users_handler(call: CallbackQuery):
             f'За последний месяц: {dict_users_added["users_added_last_month"]}\n')
 
     users = [(user["telegram_id"], user["subscription_time"]) for user in users_data]
-    # logger.debug(f"Список пользователей {users}")
+
     if not users:
         await call.message.answer(
             "📭 Нет пользователей для экспорта.", reply_markup=admin_kb()
         )
         return
 
-    csv_data = "tg_id, Дата и время подписки\n"  # Заголовщк CSV
+    # Создание CSV файла
+    csv_data = "tg_id, Дата и время подписки\n"  # Заголовок CSV
     for user in users:
         csv_data += f"{user[0]}, {user[1]}\n"
-        # logger.debug(f"{user[0]}, {user[1]}")
 
-    file_name = BytesIO(csv_data.encode("utf-8-sig"))
-    file_name.seek(0)
+    csv_file = BytesIO(csv_data.encode("utf-8-sig"))
+    csv_file.seek(0)
 
-    file = BufferedInputFile(file_name.getvalue(), filename="users_export.xlsx")
+    csv_buffered_file = BufferedInputFile(csv_file.getvalue(), filename="users_export.csv")
+
+    # Создание TXT файла с только Telegram ID
+    txt_data = "\n".join([str(user[0]) for user in users])  # Только Telegram ID
+    txt_file = BytesIO(txt_data.encode("utf-8-sig"))
+    txt_file.seek(0)
+
+    txt_buffered_file = BufferedInputFile(txt_file.getvalue(), filename="users_export.txt")
+
+    # Отправка обоих файлов
+    await call.message.answer_document(
+        csv_buffered_file,
+        caption=text,
+    )
 
     await call.message.answer_document(
-        file,
-        caption=text,
+        txt_buffered_file,
+        caption="📜 Список Telegram ID пользователей.",
         reply_markup=admin_kb(),
     )
-    file_name.close()
 
+    # Закрытие файлов
+    csv_file.close()
+    txt_file.close()
 
 @router.callback_query(F.data == 'admin_broadcast', IsAdminFilter())
 async def admin_broadcast_handler(call: CallbackQuery, state: FSMContext):
     await call.answer()
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text='Назад', callback_data='admin_panel'))
     await call.message.answer(
         'Отправьте любое сообщение, а я его перехвачу и перешлю всем пользователям с базы данных'
     )
@@ -76,13 +94,14 @@ async def admin_broadcast_handler(call: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "subscription", IsAdminFilter())
 async def handle_subscription(callback: CallbackQuery, state: FSMContext):
     await state.clear()
-    dict_subscription: dict = await get_subscription()
+    dict_subscription: Optional[List[Dict]] = await get_subscription()
     builder = InlineKeyboardBuilder()
     text = ''
     if dict_subscription:
         text = '<b>Обязательные подписки: </b>'
-        for k, v in dict_subscription.items():
-            builder.row(InlineKeyboardButton(text=f"{k}", callback_data=f"view_{v}"))
+        for data in dict_subscription:
+            for k, v in data.items():
+                builder.row(InlineKeyboardButton(text=f"{k}", callback_data=f"view_{v}"))
     else:
         text = "<b>Добавить подписку</b> 👇"
     builder.row(InlineKeyboardButton(text="Добавить подписку", callback_data="add_sub"))
