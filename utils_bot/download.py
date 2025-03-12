@@ -44,6 +44,7 @@ async def fetch_formats(url, proxy):
 
 async def video(url):
     try:
+        cookies = os.path.join(BASE_DIR, 'cookies/cookies.txt')
         proxy = PROXY
         logger.info(f"Передаю прокси для скачивания: {proxy}")
         output_template = os.path.expanduser('~/Videos/%(title)s.%(ext)s')
@@ -56,7 +57,7 @@ async def video(url):
         command = [
             'yt-dlp',
             '--proxy', proxy,
-            '--cookies', 'cookies.txt',
+            '--cookies', cookies,
             '-o', output_template,
             '-f',
             'bestvideo[vcodec^=avc1][width<=720][height<=1280]+bestaudio/bestvideo[vcodec^=avc1][width<=1280][height<=720]+bestaudio' if 'youtu' in url else 'best',
