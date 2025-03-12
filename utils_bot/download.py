@@ -2,9 +2,11 @@ import asyncio
 import os
 import re
 import yt_dlp
-from config import PROXY
+from fake_useragent import UserAgent
+
+from config import PROXY, BASE_PATH
 from logger import logger
-from utils_bot.cookies import get_params_for_session
+from utils_bot.cookies import open_page_with_cookies
 
 
 async def fetch_formats(url, proxy):
@@ -113,56 +115,55 @@ async def fetch_formats(url, proxy):
 #         return None
 
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-VIDEOS_DIR = os.path.join(BASE_DIR, 'Videos')
 
-async def video(url):
-    try:
-        proxy = PROXY
-        logger.info(f"Передаю прокси для скачивания: {proxy}")
-        # Указываем путь к выходному файлу
-        output_template = os.path.join(VIDEOS_DIR, '%(title)s.%(ext)s')
+VIDEOS_DIR = os.path.join(BASE_PATH, 'Videos')
+cookies_file = os.path.join(BASE_PATH, 'cookies/cookies.txt')
 
-        # Если папка не существует, создаем её
-        os.makedirs(VIDEOS_DIR, exist_ok=True)
-        # Если папка не существует, создаем её
-        os.makedirs(os.path.dirname(output_template), exist_ok=True)
+async def video(url, cookies=cookies_file, max_retries=3):
+    ua = UserAgent()
+    user_agent = ua.random
+    attempt = 0  # Счетчик попыток
 
-        logger.info(f"Скачиваю видео {url}")
+    while attempt < max_retries:
+        try:
+            proxy = f'http://{PROXY}'
+            logger.info(f"Передаю прокси для скачивания: {proxy}")
+            output_template = os.path.join(VIDEOS_DIR, '%(title)s.%(ext)s')
 
-        params = await get_params_for_session(url)
+            os.makedirs(VIDEOS_DIR, exist_ok=True)
+            os.makedirs(os.path.dirname(output_template), exist_ok=True)
 
-        downloaded_file_path = None  # Инициализируем переменную для хранения пути к скачанному файлу
+            logger.info(f"Скачиваю видео {url}")
 
+            ydl_opts = {
+                'proxy': proxy,
+                'cookiefile': cookies,
+                'socket_timeout': 30,
+                'outtmpl': output_template,
+                'merge_output_format': 'mp4',
+                'format': 'bestvideo[vcodec^=avc1][width<=720][height<=1280]+bestaudio/bestvideo[vcodec^=avc1][width<=1280][height<=720]+bestaudio' if 'youtube' in url else 'best',
+                'user_agent': user_agent,
+            }
 
-        ydl_opts = {
-            'proxy': proxy,
-            'cookiefile': params['cookies_file'],
-            'socket_timeout': 30,
-            'outtmpl': output_template,
-            'merge_output_format': 'mp4',
-            'format': 'bestvideo[vcodec^=avc1][width<=720][height<=1280]+bestaudio/bestvideo[vcodec^=avc1][width<=1280][height<=720]+bestaudio' if 'youtube' in url else 'best',
-            'user_agent': params['user_agent'],
-        }
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info_dict = ydl.extract_info(url, download=True)
+                downloaded_file_path = ydl.prepare_filename(info_dict)
 
-        # Используем yt-dlp для загрузки видео
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # Сначала извлекаем информацию о видео
-            info_dict = ydl.extract_info(url, download=True)
-            # Получаем путь к загруженному файлу
-            downloaded_file_path = ydl.prepare_filename(info_dict)
+            logger.info(downloaded_file_path)
+            if downloaded_file_path and os.path.exists(downloaded_file_path):
+                logger.info(f"Видео успешно скачано: {downloaded_file_path}")
+                return downloaded_file_path
+            else:
+                logger.error("Не удалось получить путь к скачанному файлу.")
+                return None
 
-        logger.info(downloaded_file_path)
-        if downloaded_file_path and os.path.exists(downloaded_file_path):
-            logger.info(f"Видео успешно скачано: {downloaded_file_path}")
-            return downloaded_file_path
-        else:
-            logger.error("Не удалось получить путь к скачанному файлу.")
-            return None
+        except Exception as e:
+            logger.error(f"Произошла ошибка в функции video: {e}")
+            attempt += 1  # Увеличиваем счетчик попыток
+            logger.info(f"Попытка {attempt} из {max_retries}. Повторная попытка...")
+            # Пытаемся обновить куки и повторить загрузку
+            cookies = await open_page_with_cookies(url, user_agent, proxy=PROXY)
 
-    except Exception as e:
-        logger.error(f"Произошла ошибка в функции video: {e}")
-        return None
+    logger.error("Все попытки завершились неудачей.")
+    return None
 
-
-asyncio.run(video("https://youtube.com/shorts/goxd0nMdI4Y?si=53E_GCLb-bjBxOfK"))

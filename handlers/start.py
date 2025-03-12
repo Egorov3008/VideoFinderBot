@@ -1,8 +1,10 @@
 import os
 import re
 
+import validators
 from aiogram import Router, F
 from aiogram.filters import CommandStart
+from aiogram.fsm.context import FSMContext
 from aiogram.types import (
     Message, FSInputFile, InlineKeyboardButton, CallbackQuery, )
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -18,7 +20,8 @@ router = Router()
 
 
 @router.message(CommandStart())
-async def start(message: Message):
+async def start(message: Message, state: FSMContext):
+    await state.clear()
     builder = InlineKeyboardBuilder()
     is_admin = message.from_user.id in ADMIN_ID
     users = await get_all_users()
@@ -30,14 +33,11 @@ async def start(message: Message):
         )
     if is_admin:
         builder.row(InlineKeyboardButton(text="Админ панель🚨", callback_data="admin_panel"))
-    builder.row(InlineKeyboardButton(text="Админ", url=SUPPORT_CHAT_URL))
+    # builder.row(InlineKeyboardButton(text="Админ", url=SUPPORT_CHAT_URL))
     await start_msg(message, builder)
 
 
-URL_REGEX = r'^(https?://[^\s]+)$'
-
-
-@router.message(lambda message: re.match(URL_REGEX, message.text))
+@router.message(lambda message: validators.url(message.text))
 async def handle_message(message: Message):
     tg_id = message.from_user.id
     if await check_substraction(tg_id, message):
@@ -74,9 +74,9 @@ async def check_subs_func(call: CallbackQuery):
     tg_id = call.from_user.id
     if await check_substraction(tg_id, call):
         await call.message.answer('Спасибо за подписку 🙏\n'
-                          '📥 Теперь ты можешь отправь ссылку на видео из\n'
-                          'Instagram, TikTok, YouTube, VK или Pinterest\n '
-                          'И бот скачает видео без водяного знака.')
+                                  '📥 Теперь ты можешь отправь ссылку на видео из\n'
+                                  'Instagram, TikTok, YouTube, VK или Pinterest\n '
+                                  'И бот скачает видео без водяного знака.')
 
 
 async def start_msg(message: Message, kb: InlineKeyboardBuilder):
