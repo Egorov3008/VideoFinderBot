@@ -56,4 +56,5 @@ def edit_sub(url_sub):
     builder = InlineKeyboardBuilder()
     builder.row(InlineKeyboardButton(text="Удалить канал", callback_data=f"delete_{url_sub}"))
     builder.row(InlineKeyboardButton(text="Изменить", callback_data="edit"))
+    builder.row(InlineKeyboardButton(text="Назад", callback_data="subscription"))
     return builder

@@ -1,33 +1,38 @@
 import asyncio
 
+from aiogram import Bot
 from aiogram.enums import ContentType, ChatMemberStatus
-
+from aiogram.fsm.context import FSMContext
+from aiogram.types import Message, InputMediaDocument, InputMediaVideo, InputMediaPhoto, InputMediaAudio
 from bot import bot
 from config import ADMIN_ID
 from db import get_users_sub, add_count_users_sub, check_user_set_active
 from logger import logger
 
 
-async def check_bot_status(channel_username: str) -> bool | str:
+async def check_bot_status(channel_username) -> bool | str:
     try:
         # Получаем ID бота
         bot_id = (await bot.get_me()).id
         logger.info(f"ID бота: {bot_id}")
+        if channel_username.startswith('+'):
 
-        member = await bot.get_chat_member(chat_id=f"@{channel_username}", user_id=bot_id)
+            logger.debug(f"Получаю ссылку канала: {channel_username}")
+            chat_id: int = await get_chat_id(bot, channel_username)
+
+        else:
+            chat_id: str = f"@{channel_username}"
+        member = await bot.get_chat_member(chat_id=chat_id, user_id=bot_id)
 
         if member.status in [ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.CREATOR]:
             logger.info(f"Бот является администратором канала {channel_username}.")
             return True
         else:
             logger.info(f"Бот не является участником канала {channel_username}.")
-            await bot.send_message(chat_id=ADMIN_ID[0], text=f'Бот не является админом группы: {channel_username}')
+            # await bot.send_message(chat_id=ADMIN_ID[0], text=f'Бот не является админом группы: {channel_username}')
             return False
     except Exception as e:
         logger.error(f"Ошибка при проверке статуса бота: {e}")
-        await bot.send_message(chat_id=ADMIN_ID[0],
-                               text=f'Не удалось определить статус бота в группе: \n'
-                                    f'<code>https://t.me/{channel_username}</code>')
         return False
 
 
@@ -66,28 +71,40 @@ async def is_user_subscribed(channel_url: str, telegram_id: int) -> bool:
             return False
 
 
-async def broadcast_message(users_data: list, text: str = None, photo_id: int = None, document_id: int = None,
-                            video_id: int = None, audio_id: int = None, caption: str = None, content_type: str = None):
-    good_send = 0
-    bad_send = 0
 
-    for user in users_data:
-        try:
-            chat_id = user.get('telegram_id')
-            if content_type == ContentType.TEXT:
-                await bot.send_message(chat_id=chat_id, text=text)
-            elif content_type == ContentType.PHOTO:
-                await bot.send_photo(chat_id=chat_id, photo=photo_id, caption=caption)
-            elif content_type == ContentType.DOCUMENT:
-                await bot.send_document(chat_id=chat_id, document=document_id, caption=caption)
-            elif content_type == ContentType.VIDEO:
-                await bot.send_video(chat_id=chat_id, video=video_id, caption=caption)
-            elif content_type == ContentType.AUDIO:
-                await bot.send_audio(chat_id=chat_id, audio=audio_id, caption=caption)
-            good_send += 1
-        except Exception as e:
-            print(e)
-            bad_send += 1
-        finally:
-            await asyncio.sleep(1)
-    return good_send, bad_send
+
+async def msg_post(message: Message, state: FSMContext, chat_id):
+    media_list = []
+    data = await state.get_data()
+    media_group_id = data.get("media_group", [])
+    for media in media_group_id:
+        if media.photo:
+            media_list.append(InputMediaPhoto(media=media.photo[-1].file_id))
+        elif media.video:
+            media_list.append(InputMediaVideo(media=media.video.file_id))
+        elif media.document:
+            media_list.append(InputMediaDocument(media=media.document.file_id))
+        elif media.audio:
+            media_list.append(InputMediaAudio(media=media.audio.file_id))
+
+    await bot.send_media_group(chat_id=chat_id, media=media_list)
+    await asyncio.sleep(1)
+    await message.copy_to(chat_id=chat_id)
+
+
+async def get_chat_id(bot: Bot, invite_link: str):
+    try:
+        # Если ссылка начинается с https://t.me/+, извлекаем уникальный идентификатор
+        if invite_link.startswith("+"):
+            invite_hash = invite_link.lstrip("+")
+            logger.debug(f'invite_hash: {invite_hash}')
+            chat = await bot.get_chat(chat_id=invite_hash)
+        else:
+            # Если это username, используем его напрямую
+            chat = await bot.get_chat(chat_id=invite_link)
+
+        # Возвращаем chat_id
+        return chat.id
+    except Exception as e:
+        logger.error(f"Ошибка при получении chat_id: {e}")
+        return None

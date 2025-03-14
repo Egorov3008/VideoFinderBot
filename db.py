@@ -253,16 +253,22 @@ async def add_count_users_sub(url_subscription: str, telegram_id: int):
     :param url_subscription: URL подписки.
     :param telegram_id: Уникальный идентификатор пользователя в Telegram.
     """
-    async with aiosqlite.connect("bot.db") as db:
-        await db.execute("""
-                            INSERT INTO count_users_sub (url_subscription, telegram_id)
-                            VALUES (?, ?)
-                            ON CONFLICT(url_subscription, telegram_id) DO NOTHING
-                        """, (url_subscription, telegram_id))
-        await db.commit()
+    try:
+        async with aiosqlite.connect("bot.db") as db:
+            # Используем контекстный менеджер для транзакции
+            async with db.execute("""
+                INSERT INTO count_users_sub (url_subscription, telegram_id)
+                VALUES (?, ?)
+                ON CONFLICT(url_subscription, telegram_id) DO NOTHING
+            """, (url_subscription, telegram_id)) as cursor:
+                await db.commit()
+                logger.info(f"Добавлена запись: {url_subscription}, {telegram_id}")
 
-        await plus_users_sub(url_subscription)
-
+            # Увеличиваем счётчик подписчиков
+            await plus_users_sub(url_subscription)
+    except aiosqlite.Error as e:
+        logger.error(f"Ошибка при добавлении записи в базу данных: {e}")
+        raise  # Повторно выбрасываем исключение для обработки на уровне выше
 
 async def get_users_sub(url_subscription: str) -> Optional[list[int]]:
     """

@@ -1,3 +1,4 @@
+import asyncio
 from io import BytesIO
 from typing import Optional, List, Dict
 
@@ -8,11 +9,14 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, BufferedInputFile
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram import html
+from selenium.webdriver.common.devtools.v85.runtime import await_promise
+
+from bot import bot
 from db import get_all_users, get_subscription, add_sub_url, delete_subscription, get_user_counts, get_info_subscription
 from filters.admin import IsAdminFilter
 from kb import admin_kb, edit_sub
 from logger import logger
-from utils_bot.utils import broadcast_message
+from utils_bot.utils import msg_post, check_bot_status
 
 router = Router()
 
@@ -20,6 +24,11 @@ router = Router()
 class Form(StatesGroup):
     start_broadcast = State()
     sub_action = State()
+
+
+class MediaGroupState(StatesGroup):
+    waiting_for_media_group = State()
+    send_media_group = State()
 
 
 @router.callback_query(F.data == 'admin_panel', IsAdminFilter())
@@ -87,7 +96,11 @@ async def admin_broadcast_handler(call: CallbackQuery, state: FSMContext):
     builder = InlineKeyboardBuilder()
     builder.row(InlineKeyboardButton(text='Назад', callback_data='admin_panel'))
     await call.message.answer(
-        'Отправьте любое сообщение, а я его перехвачу и перешлю всем пользователям с базы данных',
+        'Отправьте любое сообщение, а я его перехвачу и перешлю всем пользователям с базы данных\n\n'
+        'Для отправки альбома:\n'
+        '1. Отправьте одним сообщением все медиафайлы\n'
+        '2. После их загрузки отправьте текстовое сообщение в необходимом формате.\n\n'
+        'Для отправки одного подписанного медиа-файла можно отправлять как обычно 🙂',
         reply_markup=builder.as_markup()
     )
     await state.set_state(Form.start_broadcast)
@@ -111,30 +124,68 @@ async def handle_subscription(callback: CallbackQuery, state: FSMContext):
     await callback.message.answer(text, reply_markup=builder.as_markup())
 
 
-@router.message(F.content_type.in_({'text', 'photo', 'document', 'video', 'audio'}), Form.start_broadcast,
-                IsAdminFilter())
-async def universe_broadcast(message: Message, state: FSMContext):
+@router.message(Form.start_broadcast)
+async def handle_media_group_start(message: Message, state: FSMContext):
+    if message.media_group_id:
+        logger.info("Приступаю к сбору медиагруппы")
+        data = await state.get_data()
+        media_group = data.get("media_group", [])
+        logger.info(f"Длина media_group: {len(media_group)}")
+        if media_group:
+            logger.info("Добавляем сообщение в медиагруппу")
+            media_group.append(message)
+            await state.update_data(media_group=media_group)
+            return
+        await state.update_data(media_group=[message])
+        await state.set_state(MediaGroupState.send_media_group)
+    else:
+        good_send = 0
+        bad_send = 0
+        users_data = await get_all_users()
+        buttons = InlineKeyboardBuilder()
+        buttons.row(InlineKeyboardButton(text="Админ_панель", callback_data="admin_panel"))
+        await message.answer(f'Начинаю рассылку на {len(users_data)} пользователей.')
+        try:
+            for user in users_data:
+                chat_id = user.get('telegram_id')
+                await message.copy_to(chat_id=chat_id)
+                good_send += 1
+        except Exception as e:
+            logger.error(f"Ошибка при пересылке сообщения: {e}")
+            bad_send += 1
+        finally:
+            await state.clear()
+            await message.answer(f'Рассылка завершена. Сообщение получило <b>{good_send}</b>, '
+                                 f'НЕ получило <b>{bad_send}</b> пользователей.', reply_markup=admin_kb())
+
+
+@router.message(F.text, MediaGroupState.send_media_group)
+async def handle_text_msg(message: Message, state: FSMContext):
+    good_send = 0
+    bad_send = 0
     users_data = await get_all_users()
-    await message.answer(f'Начинаю рассылку на {len(users_data)} пользователей.')
-
-    # Определяем параметры для рассылки в зависимости от типа сообщения
-    content_type = message.content_type
-
-    good_send, bad_send = await broadcast_message(
-        users_data=users_data,
-        text=message.text if content_type == ContentType.TEXT else None,
-        photo_id=message.photo[-1].file_id if content_type == ContentType.PHOTO else None,
-        document_id=message.document.file_id if content_type == ContentType.DOCUMENT else None,
-        video_id=message.video.file_id if content_type == ContentType.VIDEO else None,
-        audio_id=message.audio.file_id if content_type == ContentType.AUDIO else None,
-        caption=message.caption,
-        content_type=content_type
-    )
     buttons = InlineKeyboardBuilder()
     buttons.row(InlineKeyboardButton(text="Админ_панель", callback_data="admin_panel"))
-    await state.clear()
-    await message.answer(f'Рассылка завершена. Сообщение получило <b>{good_send}</b>, '
-                         f'НЕ получило <b>{bad_send}</b> пользователей.', reply_markup=admin_kb())
+    await message.answer(f'Начинаю рассылку на {len(users_data)} пользователей.')
+    try:
+        for user in users_data:
+            chat_id = user.get('telegram_id')
+            await msg_post(message, state, chat_id=chat_id)
+            good_send += 1
+    except Exception as e:
+        logger.error(f"Ошибка при пересылке сообщения: {e}")
+        bad_send += 1
+
+    finally:
+        await state.clear()
+        await message.answer(f'Рассылка завершена. Сообщение получило <b>{good_send}</b>, '
+                             f'НЕ получило <b>{bad_send}</b> пользователей.', reply_markup=admin_kb())
+
+
+async def check_media_group(state: FSMContext):
+    data = await state.get_data()
+    media_group = data.get("media_group", [])
+    return len(media_group) > 1
 
 
 @router.callback_query(F.data.startswith("view_"), IsAdminFilter())
@@ -147,8 +198,12 @@ async def handel_view_subscription(callback: CallbackQuery, state: FSMContext):
     await state.update_data(url_sub=url_subscription)
     link = html.link(info_sub["name_subscription"], info_sub["url_subscription"])
     activ_sub = "АКТИВНА" if not info_sub["active"] else "ВЫПОЛНЕНО"
+    channel_username: str = url_subscription.split('/')[-1]
+    is_bot_admin = await check_bot_status(channel_username)
+    state_bot = "Админ" if is_bot_admin else "Бот не является админом"
     text = (f"<b>Подписка</b> {link}\n"
-            f"<b>Статус</b> {activ_sub}\n"
+            f"<b>Статус подписки</b> {activ_sub}\n"
+            f"<b>Статус бота в группе: {state_bot}</b>\n"
             f"<b>Пользователей подписалось</b> {info_sub['users_actual']}\n"
             f"<b>Установленный лимит подписчиков</b> {info_sub['users_set']}")
     await callback.message.answer(text, reply_markup=kb.as_markup())
@@ -159,7 +214,10 @@ async def handle_add_sub(callback: CallbackQuery, state: FSMContext):
     await callback.message.answer(
         "<b>Пожалуйста, введите ссылку на канал и его название, разделив их символом '|'.</b>\n"
         "Пример: 👇\n\nhttps://t.me/username|название канала|количество пользователей\n\n"
-        "Обратите внимание, что название канала должно быть коротким и легко воспринимаемым для вас.")
+        "Обратите внимание, что название канала должно быть коротким и легко воспринимаемым для вас.\n"
+        "!!! для проверки подписки пользователей группа должна иметь @username\n"
+        "Группы с такими ссылками: 'https://t.me/+b8i31D-0UHwzY2Ji' не определяются, даже если бот является админом\n"
+        "Добавить username")
     await state.set_state(Form.sub_action)
 
 
@@ -175,7 +233,9 @@ async def handle_url_sub(message: Message, state: FSMContext):
     await add_sub_url(name=name_sub, url_sub=sub_url, users_set=int(users_set))
     buttons = InlineKeyboardBuilder()
     buttons.row(InlineKeyboardButton(text="Назад", callback_data="subscription"))
-    await message.answer("Подписка принята", reply_markup=buttons.as_markup())
+    link = html.link('канала', sub_url)
+    await message.answer(f"Подписка принята, не забудьте добавить бота в админы {link}",
+                         reply_markup=buttons.as_markup())
 
 
 @router.callback_query(F.data.startswith("delete_"), IsAdminFilter())

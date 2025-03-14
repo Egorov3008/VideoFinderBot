@@ -132,7 +132,7 @@ async def check_substraction(tg_id, message: Message | CallbackQuery):
             for dict_sub in list_sub  # Перебираем каждый словарь в списке
             for channel, url_sub in dict_sub.items()  # Перебираем пары channel: url_sub в каждом словаре
         }
-        logger.debug(f"Статусы подписок пользователей: {dict_sub_users}")
+        logger.debug(f"Статусы подписок пользователя: {dict_sub_users}")
 
         if not any(v for v in dict_sub_users.values() if v):
             logger.warning(f"Пользователь {tg_id} не подписан на один или несколько каналов.")
