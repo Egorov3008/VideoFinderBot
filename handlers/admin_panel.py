@@ -145,18 +145,18 @@ async def handle_media_group_start(message: Message, state: FSMContext):
         buttons = InlineKeyboardBuilder()
         buttons.row(InlineKeyboardButton(text="Админ_панель", callback_data="admin_panel"))
         await message.answer(f'Начинаю рассылку на {len(users_data)} пользователей.')
-        try:
-            for user in users_data:
+        for user in users_data:
+            try:
                 chat_id = user.get('telegram_id')
                 await message.copy_to(chat_id=chat_id)
                 good_send += 1
-        except Exception as e:
-            logger.error(f"Ошибка при пересылке сообщения: {e}")
-            bad_send += 1
-        finally:
-            await state.clear()
-            await message.answer(f'Рассылка завершена. Сообщение получило <b>{good_send}</b>, '
-                                 f'НЕ получило <b>{bad_send}</b> пользователей.', reply_markup=admin_kb())
+            except Exception as e:
+                logger.error(f"Ошибка при пересылке сообщения: {e}")
+                bad_send += 1
+
+        await state.clear()
+        await message.answer(f'Рассылка завершена. Сообщение получило <b>{good_send}</b>, '
+                                     f'НЕ получило <b>{bad_send}</b> пользователей.', reply_markup=admin_kb())
 
 
 @router.message(F.text, MediaGroupState.send_media_group)
@@ -167,25 +167,21 @@ async def handle_text_msg(message: Message, state: FSMContext):
     buttons = InlineKeyboardBuilder()
     buttons.row(InlineKeyboardButton(text="Админ_панель", callback_data="admin_panel"))
     await message.answer(f'Начинаю рассылку на {len(users_data)} пользователей.')
-    try:
-        for user in users_data:
+
+    for user in users_data:
+        try:
             chat_id = user.get('telegram_id')
             await msg_post(message, state, chat_id=chat_id)
             good_send += 1
-    except Exception as e:
-        logger.error(f"Ошибка при пересылке сообщения: {e}")
-        bad_send += 1
-
-    finally:
-        await state.clear()
-        await message.answer(f'Рассылка завершена. Сообщение получило <b>{good_send}</b>, '
-                             f'НЕ получило <b>{bad_send}</b> пользователей.', reply_markup=admin_kb())
+        except Exception as e:
+            logger.error(f"Ошибка при пересылке сообщения: {e}")
+            bad_send += 1
 
 
-async def check_media_group(state: FSMContext):
-    data = await state.get_data()
-    media_group = data.get("media_group", [])
-    return len(media_group) > 1
+    await state.clear()
+    await message.answer(f'Рассылка завершена. Сообщение получило <b>{good_send}</b>, '
+                                 f'НЕ получило <b>{bad_send}</b> пользователей.', reply_markup=admin_kb())
+
 
 
 @router.callback_query(F.data.startswith("view_"), IsAdminFilter())
