@@ -1,10 +1,9 @@
+import asyncio
 import logging
 from typing import List, Dict, Optional, Any
-
+from logger import logger
 import aiosqlite
 
-logger = logging.getLogger('aiosqlite')
-logger.setLevel(logging.INFO)
 
 
 async def initialize_database():
@@ -287,7 +286,7 @@ async def get_users_sub(url_subscription: str) -> Optional[list[int]]:
             return [row[0] for row in results] if results else []
 
 
-async def plus_users_sub(url_subscription: str) -> Any:
+async def plus_users_sub(url_subscription: str) -> Optional[int]:
     """
     Увеличивает счетчик пользователей для подписки и возвращает новое значение.
 
@@ -295,14 +294,36 @@ async def plus_users_sub(url_subscription: str) -> Any:
     :return: Новое значение счетчика пользователей или None, если подписка не найдена.
     """
     logger.info(f"Добавляю +1 к счетчику пользователей для {url_subscription}")
-    async with aiosqlite.connect("bot.db") as db:
-        await db.execute("""
-            UPDATE subscription
-            SET users_actual = users_actual + 1
-            WHERE url_subscription = ?
-        """, (url_subscription,))
-        await db.commit()
 
+    try:
+        async with aiosqlite.connect("bot.db") as db:
+            # Проверяем, существует ли подписка
+            cursor = await db.execute("""
+                SELECT users_actual FROM subscription
+                WHERE url_subscription = ?
+            """, (url_subscription,))
+            row = await cursor.fetchone()
+
+            if row is None:
+                logger.warning(f"Подписка с URL {url_subscription} не найдена.")
+                return None
+
+            # Увеличиваем счетчик пользователей
+            await db.execute("""
+                UPDATE subscription
+                SET users_actual = users_actual + 1
+                WHERE url_subscription = ?
+            """, (url_subscription,))
+            await db.commit()
+
+            # Возвращаем новое значение счетчика
+            new_count = row[0] + 1
+            logger.info(f"Новый счетчик пользователей для {url_subscription}: {new_count}")
+            return new_count
+
+    except Exception as e:
+        logger.error(f"Ошибка при обновлении счетчика пользователей: {e}")
+        return None
 
 async def get_user_set(url_subscription: str) -> Optional[int]:
     """
@@ -343,5 +364,7 @@ async def check_user_set_active(user_active: int, url_subscription: str) -> bool
                 WHERE url_subscription = ?
             """, (url_subscription,))
             await db.commit()
+
         return True
     return False
+
